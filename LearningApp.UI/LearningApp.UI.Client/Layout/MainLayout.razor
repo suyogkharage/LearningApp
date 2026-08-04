@@ -1,0 +1,19 @@
+@inherits LayoutComponentBase
+
+<div class="app-shell">
+    <aside class="app-sidebar">
+        <NavMenu />
+    </aside>
+    <main class="app-main">
+        <div class="top-bar">
+            <AuthorizeView>
+                <Authorized>
+                    <span>@context.User.Identity?.Name</span>
+                </Authorized>
+            </AuthorizeView>
+        </div>
+        <section class="content">
+            @Body
+        </section>
+    </main>
+</div>

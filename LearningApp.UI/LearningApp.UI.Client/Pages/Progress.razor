@@ -1,0 +1,45 @@
+@page "/progress"
+@attribute [Authorize]
+@inject LearningProgressApiService ProgressService
+@inject EnrollmentApiService EnrollmentService
+
+<PageTitle>Progress</PageTitle>
+<h1>Learning Progress</h1>
+<ErrorAlert Errors="@errors" />
+
+<EditForm Model="@form" OnValidSubmit="SaveAsync" class="edit-row">
+    <DataAnnotationsValidator />
+    <InputSelect class="form-select" @bind-Value="form.EnrollmentId">
+        <option value="">Enrollment</option>
+        @foreach (var enrollment in enrollments) { <option value="@enrollment.EnrollmentId">@enrollment.UserName - @enrollment.CourseTitle</option> }
+    </InputSelect>
+    <InputNumber class="form-control" @bind-Value="form.PercentComplete" />
+    <InputText class="form-control" placeholder="Notes" @bind-Value="form.Notes" />
+    <button class="btn btn-primary">Save</button>
+</EditForm>
+
+<LoadingIndicator IsLoading="@isLoading" />
+<table class="table app-table">
+    <thead><tr><th>Enrollment</th><th>Percent</th><th>Last Accessed</th><th>Notes</th><th></th></tr></thead>
+    <tbody>
+        @foreach (var item in progress)
+        {
+            <tr>
+                <td>@item.EnrollmentId</td><td>@item.PercentComplete%</td><td>@item.LastAccessedUtc?.ToLocalTime().ToShortDateString()</td><td>@item.Notes</td>
+                <td><button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(item.LearningProgressId)">Delete</button></td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<LearningProgressDto> progress = new();
+    private List<EnrollmentDto> enrollments = new();
+    private LearningProgressUpsertRequest form = new() { LastAccessedUtc = DateTime.UtcNow };
+    private bool isLoading;
+    private IReadOnlyCollection<string> errors = Array.Empty<string>();
+    protected override async Task OnInitializedAsync() { enrollments = (await EnrollmentService.GetAllAsync()).ToList(); await LoadAsync(); }
+    private async Task LoadAsync() { isLoading = true; progress = (await ProgressService.GetAllAsync()).ToList(); isLoading = false; }
+    private async Task SaveAsync() { try { form.LastAccessedUtc = DateTime.UtcNow; await ProgressService.SaveAsync(form); form = new() { LastAccessedUtc = DateTime.UtcNow }; await LoadAsync(); } catch (Exception ex) { errors = new[] { ex.Message }; } }
+    private async Task DeleteAsync(Guid id) { try { await ProgressService.DeleteAsync(id); await LoadAsync(); } catch (Exception ex) { errors = new[] { ex.Message }; } }
+}

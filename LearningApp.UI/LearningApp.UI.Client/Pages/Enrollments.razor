@@ -1,0 +1,49 @@
+@page "/enrollments"
+@attribute [Authorize]
+@inject EnrollmentApiService EnrollmentService
+@inject UserApiService UserService
+@inject CourseApiService CourseService
+
+<PageTitle>Enrollments</PageTitle>
+<h1>Enrollments</h1>
+<ErrorAlert Errors="@errors" />
+
+<EditForm Model="@form" OnValidSubmit="CreateAsync" class="edit-row">
+    <DataAnnotationsValidator />
+    <InputSelect class="form-select" @bind-Value="form.UserId">
+        <option value="">User</option>
+        @foreach (var user in users) { <option value="@user.UserId">@user.FullName</option> }
+    </InputSelect>
+    <InputSelect class="form-select" @bind-Value="form.CourseId">
+        <option value="">Course</option>
+        @foreach (var course in courses) { <option value="@course.CourseId">@course.Title</option> }
+    </InputSelect>
+    <button class="btn btn-primary">Enroll</button>
+</EditForm>
+
+<LoadingIndicator IsLoading="@isLoading" />
+<table class="table app-table">
+    <thead><tr><th>User</th><th>Course</th><th>Status</th><th>Enrolled</th><th></th></tr></thead>
+    <tbody>
+        @foreach (var item in enrollments)
+        {
+            <tr>
+                <td>@item.UserName</td><td>@item.CourseTitle</td><td>@item.Status</td><td>@item.EnrolledUtc.ToLocalTime().ToShortDateString()</td>
+                <td><button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(item.EnrollmentId)">Delete</button></td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<EnrollmentDto> enrollments = new();
+    private List<UserDto> users = new();
+    private List<CourseDto> courses = new();
+    private EnrollmentCreateRequest form = new();
+    private bool isLoading;
+    private IReadOnlyCollection<string> errors = Array.Empty<string>();
+    protected override async Task OnInitializedAsync() { users = (await UserService.GetAllAsync()).ToList(); courses = (await CourseService.GetAllAsync()).ToList(); await LoadAsync(); }
+    private async Task LoadAsync() { isLoading = true; enrollments = (await EnrollmentService.GetAllAsync()).ToList(); isLoading = false; }
+    private async Task CreateAsync() { try { await EnrollmentService.CreateAsync(form); form = new(); await LoadAsync(); } catch (Exception ex) { errors = new[] { ex.Message }; } }
+    private async Task DeleteAsync(Guid id) { try { await EnrollmentService.DeleteAsync(id); await LoadAsync(); } catch (Exception ex) { errors = new[] { ex.Message }; } }
+}

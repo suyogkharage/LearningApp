@@ -1,0 +1,21 @@
+@page "/login"
+@attribute [AllowAnonymous]
+@inject NavigationManager Navigation
+
+<PageTitle>Login</PageTitle>
+
+<div class="login-panel">
+    <h1>LearningApp</h1>
+    <p class="text-muted">Sign in with your personal Microsoft account.</p>
+    <button class="btn btn-primary w-100" @onclick="BeginLogin">Sign in with Microsoft</button>
+</div>
+
+@code {
+    [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
+
+    private void BeginLogin()
+    {
+        var returnUrl = string.IsNullOrWhiteSpace(ReturnUrl) ? "/" : ReturnUrl;
+        Navigation.NavigateTo($"/bff/login?returnUrl={Uri.EscapeDataString(returnUrl)}", forceLoad: true);
+    }
+}

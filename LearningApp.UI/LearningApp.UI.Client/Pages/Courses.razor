@@ -1,0 +1,51 @@
+@page "/courses"
+@attribute [Authorize]
+@inject CourseApiService CourseService
+@inject CategoryApiService CategoryService
+
+<PageTitle>Courses</PageTitle>
+<h1>Courses</h1>
+<ErrorAlert Errors="@errors" />
+
+<EditForm Model="@form" OnValidSubmit="SaveAsync" class="edit-row">
+    <DataAnnotationsValidator />
+    <InputSelect class="form-select" @bind-Value="form.CategoryId">
+        <option value="">Category</option>
+        @foreach (var category in categories) { <option value="@category.CategoryId">@category.Name</option> }
+    </InputSelect>
+    <InputText class="form-control" placeholder="Title" @bind-Value="form.Title" />
+    <InputText class="form-control" placeholder="Difficulty" @bind-Value="form.DifficultyLevel" />
+    <InputNumber class="form-control" @bind-Value="form.DurationHours" />
+    <InputCheckbox @bind-Value="form.IsPublished" /> Published
+    <button class="btn btn-primary">Save</button>
+    <button type="button" class="btn btn-secondary" @onclick="Reset">Clear</button>
+</EditForm>
+
+<LoadingIndicator IsLoading="@isLoading" />
+<table class="table app-table">
+    <thead><tr><th>Title</th><th>Category</th><th>Level</th><th>Hours</th><th>Published</th><th></th></tr></thead>
+    <tbody>
+        @foreach (var item in courses)
+        {
+            <tr>
+                <td>@item.Title</td><td>@item.CategoryName</td><td>@item.DifficultyLevel</td><td>@item.DurationHours</td><td>@item.IsPublished</td>
+                <td><button class="btn btn-sm btn-outline-primary" @onclick="() => Edit(item)">Edit</button> <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(item.CourseId)">Delete</button></td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<CourseDto> courses = new();
+    private List<CategoryDto> categories = new();
+    private CourseUpsertRequest form = new();
+    private Guid? editingId;
+    private bool isLoading;
+    private IReadOnlyCollection<string> errors = Array.Empty<string>();
+    protected override async Task OnInitializedAsync() { categories = (await CategoryService.GetAllAsync()).ToList(); await LoadAsync(); }
+    private async Task LoadAsync() { isLoading = true; courses = (await CourseService.GetAllAsync()).ToList(); isLoading = false; }
+    private void Edit(CourseDto item) { editingId = item.CourseId; form = new() { CategoryId = item.CategoryId, Title = item.Title, Description = item.Description, DifficultyLevel = item.DifficultyLevel, DurationHours = item.DurationHours, IsPublished = item.IsPublished }; }
+    private void Reset() { editingId = null; form = new(); errors = Array.Empty<string>(); }
+    private async Task SaveAsync() { try { await CourseService.SaveAsync(editingId, form); Reset(); await LoadAsync(); } catch (Exception ex) { errors = new[] { ex.Message }; } }
+    private async Task DeleteAsync(Guid id) { try { await CourseService.DeleteAsync(id); await LoadAsync(); } catch (Exception ex) { errors = new[] { ex.Message }; } }
+}

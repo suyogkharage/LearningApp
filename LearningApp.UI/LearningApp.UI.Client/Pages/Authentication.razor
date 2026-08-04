@@ -1,0 +1,18 @@
+@page "/authentication/{action}"
+@attribute [AllowAnonymous]
+@inject NavigationManager Navigation
+
+<p>Redirecting...</p>
+
+@code {
+    [Parameter] public string? Action { get; set; }
+
+    protected override void OnInitialized()
+    {
+        var target = string.Equals(Action, "logout", StringComparison.OrdinalIgnoreCase)
+            ? "/bff/logout"
+            : "/bff/login";
+
+        Navigation.NavigateTo(target, forceLoad: true);
+    }
+}

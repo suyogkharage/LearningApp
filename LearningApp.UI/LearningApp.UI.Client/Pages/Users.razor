@@ -1,0 +1,41 @@
+@page "/users"
+@attribute [Authorize(Roles = "Admin")]
+@inject UserApiService Service
+
+<PageTitle>Users</PageTitle>
+<h1>Users</h1>
+<ErrorAlert Errors="@errors" />
+
+<EditForm Model="@createForm" OnValidSubmit="CreateAsync" class="edit-row">
+    <DataAnnotationsValidator />
+    <InputText class="form-control" placeholder="Email" @bind-Value="createForm.Email" />
+    <InputText class="form-control" placeholder="Full name" @bind-Value="createForm.FullName" />
+    <InputText type="password" class="form-control" placeholder="Password" @bind-Value="createForm.Password" />
+    <InputSelect class="form-select" @bind-Value="createForm.Role"><option>Admin</option><option>Learner</option></InputSelect>
+    <button class="btn btn-primary">Create</button>
+</EditForm>
+
+<LoadingIndicator IsLoading="@isLoading" />
+<table class="table app-table">
+    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Active</th><th></th></tr></thead>
+    <tbody>
+        @foreach (var user in users)
+        {
+            <tr>
+                <td>@user.FullName</td><td>@user.Email</td><td>@user.Role</td><td>@user.IsActive</td>
+                <td><button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(user.UserId)">Delete</button></td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<UserDto> users = new();
+    private UserCreateRequest createForm = new();
+    private bool isLoading;
+    private IReadOnlyCollection<string> errors = Array.Empty<string>();
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+    private async Task LoadAsync() { isLoading = true; users = (await Service.GetAllAsync()).ToList(); isLoading = false; }
+    private async Task CreateAsync() { try { await Service.CreateAsync(createForm); createForm = new(); await LoadAsync(); } catch (Exception ex) { errors = new[] { ex.Message }; } }
+    private async Task DeleteAsync(Guid id) { try { await Service.DeleteAsync(id); await LoadAsync(); } catch (Exception ex) { errors = new[] { ex.Message }; } }
+}

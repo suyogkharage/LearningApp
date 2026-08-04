@@ -1,0 +1,5 @@
+<Project>
+  <PropertyGroup>
+    <DefaultItemExcludes>$(DefaultItemExcludes);**\obj-codex\**;**\obj-codex-publish\**</DefaultItemExcludes>
+  </PropertyGroup>
+</Project>

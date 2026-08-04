@@ -1,0 +1,13 @@
+@if (Errors.Count > 0)
+{
+    <div class="alert alert-danger" role="alert">
+        @foreach (var error in Errors)
+        {
+            <div>@error</div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public IReadOnlyCollection<string> Errors { get; set; } = Array.Empty<string>();
+}

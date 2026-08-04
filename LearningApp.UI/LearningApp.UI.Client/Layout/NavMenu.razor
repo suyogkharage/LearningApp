@@ -1,0 +1,31 @@
+@inject NavigationManager Navigation
+
+<div class="brand">LearningApp</div>
+
+<AuthorizeView>
+    <Authorized>
+        <nav class="nav-list">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">Dashboard</NavLink>
+            <NavLink class="nav-link" href="categories">Categories</NavLink>
+            <NavLink class="nav-link" href="courses">Courses</NavLink>
+            <NavLink class="nav-link" href="enrollments">Enrollments</NavLink>
+            <NavLink class="nav-link" href="progress">Progress</NavLink>
+            <AuthorizeView Roles="Admin" Context="adminContext">
+                <NavLink class="nav-link" href="users">Users</NavLink>
+            </AuthorizeView>
+        </nav>
+        <button class="btn btn-outline-light logout" @onclick="Logout">Logout</button>
+    </Authorized>
+    <NotAuthorized>
+        <nav class="nav-list">
+            <NavLink class="nav-link" href="login">Login</NavLink>
+        </nav>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private void Logout()
+    {
+        Navigation.NavigateTo("/bff/logout", forceLoad: true);
+    }
+}

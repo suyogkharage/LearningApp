@@ -1,0 +1,47 @@
+@page "/categories"
+@attribute [Authorize]
+@inject CategoryApiService Service
+
+<PageTitle>Categories</PageTitle>
+<h1>Categories</h1>
+
+<ErrorAlert Errors="@errors" />
+<EditForm Model="@form" OnValidSubmit="SaveAsync" class="edit-row">
+    <DataAnnotationsValidator />
+    <InputText class="form-control" placeholder="Name" @bind-Value="form.Name" />
+    <InputText class="form-control" placeholder="Description" @bind-Value="form.Description" />
+    <InputCheckbox @bind-Value="form.IsActive" /> Active
+    <button class="btn btn-primary">Save</button>
+    <button type="button" class="btn btn-secondary" @onclick="Reset">Clear</button>
+</EditForm>
+
+<LoadingIndicator IsLoading="@isLoading" />
+<table class="table app-table">
+    <thead><tr><th>Name</th><th>Description</th><th>Active</th><th></th></tr></thead>
+    <tbody>
+        @foreach (var item in categories)
+        {
+            <tr>
+                <td>@item.Name</td><td>@item.Description</td><td>@item.IsActive</td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary" @onclick="() => Edit(item)">Edit</button>
+                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(item.CategoryId)">Delete</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<CategoryDto> categories = new();
+    private CategoryUpsertRequest form = new();
+    private Guid? editingId;
+    private bool isLoading;
+    private IReadOnlyCollection<string> errors = Array.Empty<string>();
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+    private async Task LoadAsync() { isLoading = true; categories = (await Service.GetAllAsync()).ToList(); isLoading = false; }
+    private void Edit(CategoryDto item) { editingId = item.CategoryId; form = new() { Name = item.Name, Description = item.Description, IsActive = item.IsActive }; }
+    private void Reset() { editingId = null; form = new(); errors = Array.Empty<string>(); }
+    private async Task SaveAsync() { try { await Service.SaveAsync(editingId, form); Reset(); await LoadAsync(); } catch (Exception ex) { errors = new[] { ex.Message }; } }
+    private async Task DeleteAsync(Guid id) { try { await Service.DeleteAsync(id); await LoadAsync(); } catch (Exception ex) { errors = new[] { ex.Message }; } }
+}

@@ -1,0 +1,51 @@
+@page "/"
+@attribute [Authorize]
+@inject CategoryApiService CategoryService
+@inject CourseApiService CourseService
+@inject EnrollmentApiService EnrollmentService
+@inject LearningProgressApiService ProgressService
+
+<PageTitle>Dashboard</PageTitle>
+<h1>Dashboard</h1>
+
+<ErrorAlert Errors="@errors" />
+<LoadingIndicator IsLoading="@isLoading" Text="Loading dashboard" />
+
+<div class="metrics">
+    <div class="metric"><span>@categoryCount</span><label>Categories</label></div>
+    <div class="metric"><span>@courseCount</span><label>Courses</label></div>
+    <div class="metric"><span>@enrollmentCount</span><label>Enrollments</label></div>
+    <div class="metric"><span>@averageProgress.ToString("0")%</span><label>Average progress</label></div>
+</div>
+
+@code {
+    private bool isLoading = true;
+    private int categoryCount;
+    private int courseCount;
+    private int enrollmentCount;
+    private decimal averageProgress;
+    private IReadOnlyCollection<string> errors = Array.Empty<string>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var categories = await CategoryService.GetAllAsync();
+            var courses = await CourseService.GetAllAsync();
+            var enrollments = await EnrollmentService.GetAllAsync();
+            var progress = await ProgressService.GetAllAsync();
+            categoryCount = categories.Count;
+            courseCount = courses.Count;
+            enrollmentCount = enrollments.Count;
+            averageProgress = progress.Count == 0 ? 0 : progress.Average(x => x.PercentComplete);
+        }
+        catch (Exception ex)
+        {
+            errors = new[] { ex.Message };
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

@@ -1,0 +1,68 @@
+# Build output
+bin/
+obj/
+obj-codex/
+**/bin/
+**/obj/
+**/obj-codex/
+
+# Publish and generated artifacts
+publish/
+artifacts/
+*.nupkg
+*.snupkg
+
+# Logs and diagnostics
+*.log
+logs/
+LogFiles/
+
+# Visual Studio / Rider / VS Code local state
+.vs/
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Test results and coverage
+TestResults/
+coverage/
+coverage.*
+*.coverage
+*.coveragexml
+
+# .NET local secret/config overrides
+secrets.json
+*.secrets.json
+appsettings.Local.json
+appsettings.*.Local.json
+appsettings.*.local.json
+appsettings.local.json
+
+# Azure local deployment state
+.azure/*/config.json
+.azure/*/.env
+.azure/**/*.env
+
+# Local agent/workspace metadata
+.agents/
+.codex/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.orig
+*.swp
+*~

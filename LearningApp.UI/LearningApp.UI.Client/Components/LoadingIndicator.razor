@@ -1,0 +1,12 @@
+@if (IsLoading)
+{
+    <div class="loading-row" role="status">
+        <span class="spinner-border spinner-border-sm"></span>
+        <span>@Text</span>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public string Text { get; set; } = "Loading";
+}
