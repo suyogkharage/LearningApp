@@ -3,6 +3,7 @@
 @inject EnrollmentApiService EnrollmentService
 @inject UserApiService UserService
 @inject CourseApiService CourseService
+@using System.Security.Claims
 
 <PageTitle>Enrollments</PageTitle>
 <h1>Enrollments</h1>
@@ -10,15 +11,18 @@
 
 <EditForm Model="@form" OnValidSubmit="CreateAsync" class="edit-row">
     <DataAnnotationsValidator />
-    <InputSelect class="form-select" @bind-Value="form.UserId">
-        <option value="">User</option>
-        @foreach (var user in users) { <option value="@user.UserId">@user.FullName</option> }
-    </InputSelect>
+    @if (isAdmin)
+    {
+        <InputSelect class="form-select" @bind-Value="form.UserId">
+            <option value="">User</option>
+            @foreach (var user in users) { <option value="@user.UserId">@user.FullName</option> }
+        </InputSelect>
+    }
     <InputSelect class="form-select" @bind-Value="form.CourseId">
         <option value="">Course</option>
         @foreach (var course in courses) { <option value="@course.CourseId">@course.Title</option> }
     </InputSelect>
-    <button class="btn btn-primary">Enroll</button>
+    <button class="btn btn-primary" disabled="@(!isAdmin && currentUserId is null)">Enroll</button>
 </EditForm>
 
 <LoadingIndicator IsLoading="@isLoading" />
@@ -29,7 +33,11 @@
         {
             <tr>
                 <td>@item.UserName</td><td>@item.CourseTitle</td><td>@item.Status</td><td>@item.EnrolledUtc.ToLocalTime().ToShortDateString()</td>
-                <td><button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(item.EnrollmentId)">Delete</button></td>
+                <td>
+                    <AuthorizeView Roles="Admin" Context="enrollmentRowAuth">
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(item.EnrollmentId)">Delete</button>
+                    </AuthorizeView>
+                </td>
             </tr>
         }
     </tbody>
@@ -41,9 +49,43 @@
     private List<CourseDto> courses = new();
     private EnrollmentCreateRequest form = new();
     private bool isLoading;
+    private bool isAdmin;
+    private Guid? currentUserId;
     private IReadOnlyCollection<string> errors = Array.Empty<string>();
-    protected override async Task OnInitializedAsync() { users = (await UserService.GetAllAsync()).ToList(); courses = (await CourseService.GetAllAsync()).ToList(); await LoadAsync(); }
+
+    [CascadingParameter] private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = AuthenticationStateTask is null ? null : (await AuthenticationStateTask).User;
+        isAdmin = user?.IsInRole("Admin") == true;
+        var userIdValue = user?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        currentUserId = Guid.TryParse(userIdValue, out var parsedUserId) ? parsedUserId : null;
+
+        if (isAdmin)
+        {
+            users = (await UserService.GetAllAsync()).ToList();
+        }
+
+        courses = (await CourseService.GetAllAsync()).ToList();
+        await LoadAsync();
+    }
+
     private async Task LoadAsync() { isLoading = true; enrollments = (await EnrollmentService.GetAllAsync()).ToList(); isLoading = false; }
-    private async Task CreateAsync() { try { await EnrollmentService.CreateAsync(form); form = new(); await LoadAsync(); } catch (Exception ex) { errors = new[] { ex.Message }; } }
+    private async Task CreateAsync()
+    {
+        try
+        {
+            if (!isAdmin && currentUserId is { } userId)
+            {
+                form.UserId = userId;
+            }
+
+            await EnrollmentService.CreateAsync(form);
+            form = new();
+            await LoadAsync();
+        }
+        catch (Exception ex) { errors = new[] { ex.Message }; }
+    }
     private async Task DeleteAsync(Guid id) { try { await EnrollmentService.DeleteAsync(id); await LoadAsync(); } catch (Exception ex) { errors = new[] { ex.Message }; } }
 }

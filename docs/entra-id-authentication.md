@@ -1,6 +1,6 @@
 # Microsoft Entra ID Authentication Guide
 
-> Note: this document describes the previous Blazor WebAssembly SPA/MSAL browser-token flow. The current project has moved to BFF/server-side authentication. For the current architecture, Azure portal setup, code flow, and troubleshooting guide, see [bff-server-side-authentication.md](bff-server-side-authentication.md).
+> Note: this document describes the previous SPA/MSAL browser-token flow. For current single-tenant roles and configuration, see [entra-role-authorization.md](entra-role-authorization.md). For the BFF architecture, see [bff-server-side-authentication.md](bff-server-side-authentication.md). Consumer authority examples below are historical.
 
 This document explains how LearningApp integrates Microsoft Entra ID authentication between:
 
@@ -503,14 +503,17 @@ Controllers use `[Authorize]` or authorization policies:
 [Authorize(Policy = "LearnerOrAdmin")]
 ```
 
-Policies are currently simple authenticated-user checks:
+Policies require application roles:
 
 ```csharp
-options.AddPolicy("AdminOnly", policy => policy.RequireAuthenticatedUser());
-options.AddPolicy("LearnerOrAdmin", policy => policy.RequireAuthenticatedUser());
+options.AddPolicy("AdminOnly", policy => policy.RequireAuthenticatedUser().RequireRole("Admin"));
+options.AddPolicy("LearnerOrAdmin", policy => policy.RequireAuthenticatedUser().RequireRole("Learner", "Admin"));
 ```
 
-If role-based authorization is needed later, add role claims to tokens or map app roles/groups from Entra ID.
+Microsoft users now receive permissions from Entra API access-token roles. After bearer-token
+validation, `MicrosoftAccountService` links `(iss, sub)` to an internal user for enrollments and
+progress without granting a database role. See [Entra role authorization](entra-role-authorization.md)
+for current single-tenant settings and deployment instructions.
 
 ## Login Flow
 
@@ -904,5 +907,5 @@ dotnet build .\LearningApp.UI\LearningApp.UI.Client\LearningApp.UI.Client.csproj
 - Prefer HTTPS redirect URIs for non-local environments.
 - Keep scopes least-privilege.
 - For production, use tenant-specific authorities instead of broad authorities when possible.
-- If roles are needed, implement Entra app roles or group claims and update authorization policies.
+- Microsoft sign-in uses Entra API app roles; see [Entra role authorization](entra-role-authorization.md).
 - Do not disable issuer or audience validation to make tokens pass. Fix the configuration instead.

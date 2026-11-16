@@ -7,19 +7,21 @@
 <h1>Courses</h1>
 <ErrorAlert Errors="@errors" />
 
-<EditForm Model="@form" OnValidSubmit="SaveAsync" class="edit-row">
-    <DataAnnotationsValidator />
-    <InputSelect class="form-select" @bind-Value="form.CategoryId">
-        <option value="">Category</option>
-        @foreach (var category in categories) { <option value="@category.CategoryId">@category.Name</option> }
-    </InputSelect>
-    <InputText class="form-control" placeholder="Title" @bind-Value="form.Title" />
-    <InputText class="form-control" placeholder="Difficulty" @bind-Value="form.DifficultyLevel" />
-    <InputNumber class="form-control" @bind-Value="form.DurationHours" />
-    <InputCheckbox @bind-Value="form.IsPublished" /> Published
-    <button class="btn btn-primary">Save</button>
-    <button type="button" class="btn btn-secondary" @onclick="Reset">Clear</button>
-</EditForm>
+<AuthorizeView Roles="Admin" Context="courseAuth">
+    <EditForm Model="@form" OnValidSubmit="SaveAsync" class="edit-row">
+        <DataAnnotationsValidator />
+        <InputSelect class="form-select" @bind-Value="form.CategoryId">
+            <option value="">Category</option>
+            @foreach (var category in categories) { <option value="@category.CategoryId">@category.Name</option> }
+        </InputSelect>
+        <InputText class="form-control" placeholder="Title" @bind-Value="form.Title" />
+        <InputText class="form-control" placeholder="Difficulty" @bind-Value="form.DifficultyLevel" />
+        <InputNumber class="form-control" @bind-Value="form.DurationHours" />
+        <InputCheckbox @bind-Value="form.IsPublished" /> Published
+        <button class="btn btn-primary">Save</button>
+        <button type="button" class="btn btn-secondary" @onclick="Reset">Clear</button>
+    </EditForm>
+</AuthorizeView>
 
 <LoadingIndicator IsLoading="@isLoading" />
 <table class="table app-table">
@@ -29,7 +31,12 @@
         {
             <tr>
                 <td>@item.Title</td><td>@item.CategoryName</td><td>@item.DifficultyLevel</td><td>@item.DurationHours</td><td>@item.IsPublished</td>
-                <td><button class="btn btn-sm btn-outline-primary" @onclick="() => Edit(item)">Edit</button> <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(item.CourseId)">Delete</button></td>
+                <td>
+                    <AuthorizeView Roles="Admin" Context="courseRowAuth">
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => Edit(item)">Edit</button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(item.CourseId)">Delete</button>
+                    </AuthorizeView>
+                </td>
             </tr>
         }
     </tbody>

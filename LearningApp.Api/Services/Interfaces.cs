@@ -6,6 +6,7 @@ namespace LearningApp.Api.Services;
 public interface IAuthService
 {
     Task<LoginResponse> LoginAsync(LoginRequest request, CancellationToken cancellationToken);
+    Task<LoginResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken);
 }
 
 public interface IUserService

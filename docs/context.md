@@ -179,14 +179,9 @@ Tables:
   - Tracks percent complete, last accessed date, notes, update timestamp
   - Cascades delete from enrollment
 
-Seed data is in `Database/002_seed_data.sql`. It creates an admin user, learner user, categories, courses, one enrollment, and one progress record. The README lists the seed login as:
+Seed data is in `Database/002_seed_data.sql`. It creates sample categories and courses only. It does not create demo login users, enrollments, or progress rows.
 
-```text
-Email: admin@learning.local
-Password: Password1!
-```
-
-Current authentication has moved to Microsoft Entra ID, so the local API login endpoint is disabled. Seeded local passwords are mostly historical/demo data unless local auth is reintroduced.
+The app supports both Microsoft sign-in and local email/password sign-in through the BFF. Local users should be created through registration or a controlled admin/setup process when the API has a local JWT signing key configured.
 
 ## API Surface
 
@@ -195,7 +190,9 @@ Base controller route pattern is `/api/[controller]`.
 Endpoints:
 
 - `POST /api/auth/login`
-  - Disabled and returns `410 Gone`.
+  - Local email/password login used by the BFF. Returns an API token to the BFF server, not directly to Blazor UI code.
+- `POST /api/auth/register`
+  - Creates a local `Learner` account and returns an API token to the BFF server.
 - `/api/categories`
   - Authenticated reads.
   - Create/update/delete additionally decorated with `AdminOnly`.
@@ -210,7 +207,7 @@ Endpoints:
 - `/api/users`
   - Decorated with `AdminOnly`.
 
-Important authorization note: in `ServiceCollectionExtensions.cs`, the `AdminOnly` and `LearnerOrAdmin` policies currently call `RequireAuthenticatedUser()` only. The UI uses `AuthorizeView Roles="Admin"` and `@attribute [Authorize(Roles = "Admin")]` for users, but backend role policy enforcement should be reviewed before relying on it for production authorization.
+Authorization policies are role-based in the API: `AdminOnly` requires `Admin`, and `LearnerOrAdmin` requires `Learner` or `Admin`. For Microsoft sign-in, Entra access-token roles are authoritative; `Users.Role` never grants permissions or provides a Learner fallback. Validated `(iss, sub)` links Microsoft identities to database users through `learning.ExternalLogins` for enrollments and progress; local active status is still checked. Local password users continue to use database roles via local JWTs. Run `Database/003_external_logins.sql` if not already applied. See [entra-role-authorization.md](entra-role-authorization.md).
 
 ## UI Features And Routes
 
@@ -254,12 +251,13 @@ Typical dashboard load:
 
 Current design is BFF server-side authentication:
 
-- `LearningApp.UI.Server` is a confidential web app.
-- Login is OpenID Connect authorization code flow.
+- `LearningApp.UI.Server` is a confidential web app for Microsoft sign-in and the local-login host for email/password sign-in.
+- Microsoft login uses OpenID Connect authorization code flow.
+- Local login validates email/password through the API and signs the browser in with the BFF cookie.
 - The browser receives an HttpOnly cookie named `LearningApp.Bff`.
 - `SaveTokens = true` stores tokens in the protected auth ticket.
 - The BFF proxy retrieves the access token with `HttpContext.GetTokenAsync("access_token")`.
-- `LearningApp.Api` validates JWT bearer access tokens from Microsoft Entra ID.
+- `LearningApp.Api` validates JWT bearer access tokens from Microsoft Entra ID and local JWTs issued for BFF-to-API calls.
 - The Blazor WASM client does not use MSAL and does not store access tokens in browser storage.
 
 Current local auth/config values are documented in `docs/bff-server-side-authentication.md`. Key IDs from checked-in config:
@@ -268,9 +266,19 @@ Current local auth/config values are documented in `docs/bff-server-side-authent
 - API app/client ID: `2664ec3d-e5b6-4a59-a133-429d815b1b77`
 - API Application ID URI: `api://2664ec3d-e5b6-4a59-a133-429d815b1b77`
 - API delegated scope: `api://2664ec3d-e5b6-4a59-a133-429d815b1b77/access_as_user`
-- Authority: `https://login.microsoftonline.com/consumers/v2.0`
+- Required single-tenant Authority override: `https://login.microsoftonline.com/<tenant-id>/v2.0`; override the API `AzureAd:TenantId` with the same tenant GUID. Checked-in `consumers` values are legacy defaults and must be overridden for Entra app roles.
 
 Do not commit real `AzureAd:ClientSecret` values. For local development, use .NET user secrets for `LearningApp.UI.Server`.
+
+Do not commit production `Jwt:SigningKey` values. Development config contains a dev-only local auth signing key. In Azure, set `Jwt__SigningKey` through App Service settings or a secret store.
+
+Local email/password flow:
+
+1. Browser posts credentials to `/bff/local-login` or `/bff/register`.
+2. `LearningApp.UI.Server` calls `LearningApp.Api` server-to-server.
+3. API validates or creates the user and returns a local API token to the BFF.
+4. BFF stores that token in the protected auth ticket and creates the HttpOnly auth cookie.
+5. Browser sees only the BFF cookie, never the JWT.
 
 ## Error Handling And Response Contracts
 
@@ -403,6 +411,9 @@ Production settings to configure through App Service settings/environment variab
 - UI `AzureAd__ClientId`
 - UI `AzureAd__ClientSecret`
 - UI `AzureAd__ApiScope`
+- API `Jwt__SigningKey`
+- API `Jwt__Issuer`
+- API `Jwt__Audience`
 - UI redirect URIs in the Entra app registration:
   - `https://<ui-host>/signin-oidc`
   - `https://<ui-host>/signout-callback-oidc`
@@ -426,11 +437,11 @@ Pending decisions in the deployment plan:
 - Keep secrets out of `appsettings.json`; use user secrets locally and environment variables in Azure.
 - Update `Cors:AllowedOrigins` when adding a new UI host that calls the API directly. In normal BFF operation, the browser calls the UI server same-origin.
 - If changing auth, update `docs/bff-server-side-authentication.md` and app registration settings together.
-- If tightening production authorization, update the API policies so `AdminOnly` and `LearnerOrAdmin` enforce the intended role claims.
+- Preserve API-side role and ownership enforcement; UI hiding is only a convenience.
 
 ## Known Gaps And Watch Items
 
-- API role policies currently require authentication but do not explicitly require role claims.
+- Microsoft users need Entra role claims or an account-linking flow before they can access role-protected API endpoints.
 - BFF token storage uses `SaveTokens = true`; for higher-security production, consider server-side token cache and durable Data Protection key storage.
 - State-changing BFF proxy calls should be reviewed for antiforgery protection before production hardening.
 - Deployment plan is marked `Planning`, even though the API App Service is documented as deployed.

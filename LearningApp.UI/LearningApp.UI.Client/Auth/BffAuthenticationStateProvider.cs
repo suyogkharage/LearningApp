@@ -25,6 +25,16 @@ public sealed class BffAuthenticationStateProvider(HttpClient httpClient) : Auth
                 claims.Add(new Claim(ClaimTypes.Name, user.Name));
             }
 
+            if (user.UserId is { } userId)
+            {
+                claims.Add(new Claim(ClaimTypes.NameIdentifier, userId.ToString()));
+            }
+
+            if (!string.IsNullOrWhiteSpace(user.Email))
+            {
+                claims.Add(new Claim(ClaimTypes.Email, user.Email));
+            }
+
             claims.AddRange(user.Roles.Select(role => new Claim(ClaimTypes.Role, role)));
             return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity(claims, "bff")));
         }

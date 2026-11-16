@@ -43,6 +43,10 @@ a, .btn-link {
 .login-panel { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; margin: 8vh auto; max-width: 420px; padding: 2rem; }
 .login-panel label { display: block; margin-top: 1rem; }
 .login-panel button { margin-top: 1.25rem; }
+.auth-tabs { display: grid; gap: .75rem; grid-template-columns: 1fr 1fr; margin: 1rem 0; }
+.auth-tabs button { margin-top: 0; }
+.auth-divider { align-items: center; color: #6b7280; display: flex; gap: .75rem; margin: 1.5rem 0 .25rem; }
+.auth-divider::before, .auth-divider::after { background: #e5e7eb; content: ""; flex: 1; height: 1px; }
 
 @media (max-width: 760px) {
     .app-shell { display: block; }

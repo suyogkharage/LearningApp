@@ -2,9 +2,11 @@
 bin/
 obj/
 obj-codex/
+obj-codex-publish/
 **/bin/
 **/obj/
 **/obj-codex/
+**/obj-codex-publish/
 
 # Publish and generated artifacts
 publish/
@@ -51,6 +53,11 @@ appsettings.*.local.json
 appsettings.local.json
 
 # Azure local deployment state
+# Azurite local storage data
+__azurite_db_*.json
+__queuestorage__/
+__blobstorage__/
+
 .azure/*/config.json
 .azure/*/.env
 .azure/**/*.env

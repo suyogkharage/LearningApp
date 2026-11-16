@@ -41,12 +41,10 @@ Open SQL Server Management Studio or Azure Data Studio and run:
 ```sql
 :r Database/001_create_schema.sql
 :r Database/002_seed_data.sql
+:r Database/003_external_logins.sql
 ```
 
-Seed login:
-
-- Email: `admin@learning.local`
-- Password: `Password1!`
+The seed script creates sample categories and courses only. It does not create demo login users. Register a learner from the UI, or create/administer privileged users through a controlled setup process.
 
 ## Run
 
@@ -71,3 +69,6 @@ Microsoft Entra ID setup, code wiring, login/logout flow, and troubleshooting no
 ```text
 docs/entra-id-authentication.md
 ```
+
+Current single-tenant Entra roles, local user linking, and Azure deployment steps are in
+[docs/entra-role-authorization.md](docs/entra-role-authorization.md).

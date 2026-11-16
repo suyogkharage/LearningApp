@@ -6,14 +6,16 @@
 <h1>Categories</h1>
 
 <ErrorAlert Errors="@errors" />
-<EditForm Model="@form" OnValidSubmit="SaveAsync" class="edit-row">
-    <DataAnnotationsValidator />
-    <InputText class="form-control" placeholder="Name" @bind-Value="form.Name" />
-    <InputText class="form-control" placeholder="Description" @bind-Value="form.Description" />
-    <InputCheckbox @bind-Value="form.IsActive" /> Active
-    <button class="btn btn-primary">Save</button>
-    <button type="button" class="btn btn-secondary" @onclick="Reset">Clear</button>
-</EditForm>
+<AuthorizeView Roles="Admin" Context="categoryAuth">
+    <EditForm Model="@form" OnValidSubmit="SaveAsync" class="edit-row">
+        <DataAnnotationsValidator />
+        <InputText class="form-control" placeholder="Name" @bind-Value="form.Name" />
+        <InputText class="form-control" placeholder="Description" @bind-Value="form.Description" />
+        <InputCheckbox @bind-Value="form.IsActive" /> Active
+        <button class="btn btn-primary">Save</button>
+        <button type="button" class="btn btn-secondary" @onclick="Reset">Clear</button>
+    </EditForm>
+</AuthorizeView>
 
 <LoadingIndicator IsLoading="@isLoading" />
 <table class="table app-table">
@@ -24,8 +26,10 @@
             <tr>
                 <td>@item.Name</td><td>@item.Description</td><td>@item.IsActive</td>
                 <td>
-                    <button class="btn btn-sm btn-outline-primary" @onclick="() => Edit(item)">Edit</button>
-                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(item.CategoryId)">Delete</button>
+                    <AuthorizeView Roles="Admin" Context="categoryRowAuth">
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => Edit(item)">Edit</button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteAsync(item.CategoryId)">Delete</button>
+                    </AuthorizeView>
                 </td>
             </tr>
         }

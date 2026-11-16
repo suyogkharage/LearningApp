@@ -5,6 +5,7 @@ using LearningApp.Api.Middleware;
 using LearningApp.Api.Repositories;
 using LearningApp.Api.Services;
 using LearningApp.UI.Shared.Common;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Routing;
@@ -12,7 +13,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Identity.Web;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.IdentityModel.Tokens.Jwt;
+using System.Text;
 using System.Text.Json;
 
 namespace LearningApp.Api.Extensions;
@@ -26,7 +30,13 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped(typeof(IRepository<>), typeof(EfRepository<>));
         services.AddScoped(typeof(IValidator<>), typeof(DataAnnotationsValidator<>));
+        services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
+        services.AddHttpContextAccessor();
+        services.AddScoped<ICurrentUser, CurrentUser>();
+        services.AddScoped<MicrosoftAccountService>();
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
+        services.AddScoped<IJwtTokenService, JwtTokenService>();
+        services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<ICourseService, CourseService>();
@@ -65,8 +75,22 @@ public static class ServiceCollectionExtensions
         var azureAdClientId = azureAdSection["ClientId"];
         var azureAdAudience = azureAdSection["Audience"];
 
-        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddMicrosoftIdentityWebApi(options =>
+        var jwtSettings = configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>() ?? new JwtSettings();
+        const string learningAppBearerScheme = "LearningAppBearer";
+
+        var authenticationBuilder = services.AddAuthentication(options =>
+        {
+            options.DefaultScheme = learningAppBearerScheme;
+            options.DefaultChallengeScheme = learningAppBearerScheme;
+            options.DefaultForbidScheme = learningAppBearerScheme;
+        });
+
+        authenticationBuilder.AddPolicyScheme(learningAppBearerScheme, null, options =>
+        {
+            options.ForwardDefaultSelector = context => SelectBearerScheme(context, jwtSettings);
+        });
+
+        authenticationBuilder.AddMicrosoftIdentityWebApi(options =>
             {
                 azureAdSection.Bind(options);
                 options.TokenValidationParameters.ValidAudiences = new[]
@@ -76,6 +100,22 @@ public static class ServiceCollectionExtensions
                 }.Where(value => !string.IsNullOrWhiteSpace(value));
 
                 options.Events ??= new JwtBearerEvents();
+                var previousTokenValidated = options.Events.OnTokenValidated;
+                options.Events.OnTokenValidated = async context =>
+                {
+                    await previousTokenValidated(context);
+                    if (context.Result is not null || context.Principal is null) return;
+
+                    var accounts = context.HttpContext.RequestServices.GetRequiredService<MicrosoftAccountService>();
+                    var principal = await accounts.ResolveAsync(context.Principal, context.HttpContext.RequestAborted);
+                    if (principal is null)
+                    {
+                        context.Fail("A delegated access_as_user token and an active LearningApp account are required.");
+                        return;
+                    }
+
+                    context.Principal = principal;
+                };
                 options.Events.OnChallenge = async context =>
                 {
                     context.HandleResponse();
@@ -104,10 +144,68 @@ public static class ServiceCollectionExtensions
                 };
             }, options => azureAdSection.Bind(options));
 
+        if (!string.IsNullOrWhiteSpace(jwtSettings.SigningKey))
+        {
+            authenticationBuilder.AddJwtBearer("LocalJwt", options =>
+            {
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidateLifetime = true,
+                    ClockSkew = TimeSpan.FromMinutes(2),
+                    ValidIssuer = jwtSettings.Issuer,
+                    ValidAudience = jwtSettings.Audience,
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SigningKey)),
+                    NameClaimType = System.Security.Claims.ClaimTypes.Name,
+                    RoleClaimType = System.Security.Claims.ClaimTypes.Role
+                };
+
+                options.Events = new JwtBearerEvents
+                {
+                    OnChallenge = async context =>
+                    {
+                        context.HandleResponse();
+                        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                        context.Response.ContentType = "application/json";
+
+                        var response = CreateErrorResponse(
+                            context.HttpContext,
+                            StatusCodes.Status401Unauthorized,
+                            "You are not authenticated.");
+
+                        await context.Response.WriteAsJsonAsync(response);
+                    },
+                    OnForbidden = async context =>
+                    {
+                        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                        context.Response.ContentType = "application/json";
+
+                        var response = CreateErrorResponse(
+                            context.HttpContext,
+                            StatusCodes.Status403Forbidden,
+                            "You do not have permission to access this resource.");
+
+                        await context.Response.WriteAsJsonAsync(response);
+                    }
+                };
+            });
+        }
+
         services.AddAuthorization(options =>
         {
-            options.AddPolicy("AdminOnly", policy => policy.RequireAuthenticatedUser());
-            options.AddPolicy("LearnerOrAdmin", policy => policy.RequireAuthenticatedUser());
+            options.AddPolicy("AdminOnly", policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.RequireRole("Admin");
+            });
+
+            options.AddPolicy("LearnerOrAdmin", policy =>
+            {
+                policy.RequireAuthenticatedUser();
+                policy.RequireRole("Learner", "Admin");
+            });
         });
 
         services.AddEndpointsApiExplorer();
@@ -174,6 +272,36 @@ public static class ServiceCollectionExtensions
             errors,
             context.TraceIdentifier,
             context.Request.Headers["X-Correlation-Id"].FirstOrDefault());
+
+    private static string SelectBearerScheme(HttpContext context, JwtSettings jwtSettings)
+    {
+        var authorization = context.Request.Headers.Authorization.FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(authorization)
+            || !authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            return JwtBearerDefaults.AuthenticationScheme;
+        }
+
+        var token = authorization["Bearer ".Length..].Trim();
+        if (string.IsNullOrWhiteSpace(token)
+            || string.IsNullOrWhiteSpace(jwtSettings.Issuer)
+            || string.IsNullOrWhiteSpace(jwtSettings.SigningKey))
+        {
+            return JwtBearerDefaults.AuthenticationScheme;
+        }
+
+        try
+        {
+            var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
+            return string.Equals(jwt.Issuer, jwtSettings.Issuer, StringComparison.Ordinal)
+                ? "LocalJwt"
+                : JwtBearerDefaults.AuthenticationScheme;
+        }
+        catch
+        {
+            return JwtBearerDefaults.AuthenticationScheme;
+        }
+    }
 
     private static Task WriteHealthCheckResponseAsync(HttpContext context, HealthReport report)
     {
